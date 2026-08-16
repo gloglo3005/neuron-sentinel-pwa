@@ -11,6 +11,8 @@ export const citizenService = {
     apiFetch('/citizen/location', { method: 'POST', body: JSON.stringify({ latitude, longitude }) }),
   getCurrentZone: () => apiFetch('/citizen/zone/current'),
   getAlerts: () => apiFetch('/citizen/alerts'),
+  acknowledgeAlert: (alertId) =>
+    apiFetch(`/citizen/alerts/${encodeURIComponent(alertId)}/acknowledge`, { method: 'POST' }),
 
   createReport: (report) =>
     apiFetch('/citizen/reports', { method: 'POST', body: JSON.stringify(report) }),

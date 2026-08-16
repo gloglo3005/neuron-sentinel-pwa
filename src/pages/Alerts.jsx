@@ -13,6 +13,10 @@ export default function Alerts() {
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  // Per-alert ack state, keyed by alert id — a plain object is enough
+  // here, there's never more than ~20 alerts loaded at once (see
+  // listAlertsForCitizen's take: 20).
+  const [acking, setAcking] = useState({});
 
   useEffect(() => {
     citizenService
@@ -21,6 +25,20 @@ export default function Alerts() {
       .catch((err) => setError(err.message || 'Impossible de charger les alertes.'))
       .finally(() => setLoading(false));
   }, []);
+
+  async function handleAcknowledge(alertId) {
+    setAcking((prev) => ({ ...prev, [alertId]: { loading: true, error: null } }));
+    try {
+      await citizenService.acknowledgeAlert(alertId);
+      // Reflect the confirmed state from the backend's own response
+      // (implicit success — the endpoint doesn't echo the alert back, so
+      // we just flip the flag we know the server now agrees with).
+      setAlerts((prev) => prev.map((a) => (a.id === alertId ? { ...a, acknowledged: true } : a)));
+      setAcking((prev) => ({ ...prev, [alertId]: { loading: false, error: null } }));
+    } catch (err) {
+      setAcking((prev) => ({ ...prev, [alertId]: { loading: false, error: err.message || 'Échec de la confirmation.' } }));
+    }
+  }
 
   return (
     <div className="min-h-screen bg-app px-4 pt-6 pb-24">
@@ -47,6 +65,25 @@ export default function Alerts() {
               <p className="text-xs text-text-tertiary mt-2">
                 {new Date(alert.dispatchedAt).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}
               </p>
+            )}
+
+            {alert.acknowledged ? (
+              <p className="text-xs text-risk-low font-semibold mt-3 flex items-center gap-1">
+                ✓ Vous avez confirmé avoir vu cette alerte
+              </p>
+            ) : (
+              <div className="mt-3">
+                <button
+                  onClick={() => handleAcknowledge(alert.id)}
+                  disabled={acking[alert.id]?.loading}
+                  className="text-xs font-semibold text-brand border border-brand rounded-lg px-3 py-1.5 disabled:opacity-50 active:scale-[0.98] transition"
+                >
+                  {acking[alert.id]?.loading ? 'Confirmation…' : "J'ai vu cette alerte"}
+                </button>
+                {acking[alert.id]?.error && (
+                  <p className="text-xs text-risk-high mt-1">{acking[alert.id].error}</p>
+                )}
+              </div>
             )}
           </Card>
         ))}
